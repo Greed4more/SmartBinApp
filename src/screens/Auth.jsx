@@ -129,6 +129,26 @@ export default function Auth() {
           👤 {t('signInFaceId').toUpperCase()}
         </button>
 
+        <button
+          type="button"
+          onClick={async () => {
+            setError('')
+            try {
+              await login('test2@example.com', 'password')
+            } catch (err) {
+              setError(err.message)
+            }
+          }}
+          style={{
+            width: '100%', marginTop: 12, padding: '12px',
+            background: 'rgba(107,191,111,0.1)', border: '1px solid #6BBF6F',
+            color: '#6BBF6F', borderRadius: 12, fontFamily: 'var(--font-mono)', fontSize: 11,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, cursor: 'pointer'
+          }}
+        >
+          ⚡ DEMO QUICK LOGIN (ONE-CLICK)
+        </button>
+
         <div style={{ marginTop: 20, textAlign: 'center' }}>
           <button onClick={() => setIsLogin(!isLogin)} style={{ background: 'none', border: 'none', color: 'var(--yellow)', fontFamily: 'var(--font-mono)', fontSize: 11, cursor: 'pointer' }}>
             {isLogin ? t('noAccount') : t('alreadyHaveAccount')}

@@ -4,6 +4,14 @@ import { t } from '../utils/translations'
 
 const AppContext = createContext({})
 
+const safeSetItem = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (err) {
+    console.warn('localStorage write blocked:', err);
+  }
+};
+
 export function AppProvider({ children }) {
   const [user, setUser] = useState(null)
   const [binData, setBinData] = useState({ dry: 45, wet: 30, metal: 20, fill_level: 45 })
@@ -39,7 +47,7 @@ export function AppProvider({ children }) {
               setEcoCoins(data.eco_coins || 0)
               setTotalScans(data.total_scans || 0)
               setLanguage(data.language || 'en')
-              localStorage.setItem('sb_user', JSON.stringify(data))
+              safeSetItem('sb_user', JSON.stringify(data))
               subscribeRealtime(data.uid)
             } else if (error) {
               console.warn('Persistence refresh failed:', error.message)
@@ -68,7 +76,7 @@ export function AppProvider({ children }) {
       setUser(data)
       setEcoCoins(data.eco_coins || 0)
       setTotalScans(data.total_scans || 0)
-      localStorage.setItem('sb_user', JSON.stringify(data))
+      safeSetItem('sb_user', JSON.stringify(data))
       return data
     }
     return null
@@ -80,13 +88,13 @@ export function AppProvider({ children }) {
     if (error) throw error
     const updated = { ...user, ...updates }
     setUser(updated)
-    localStorage.setItem('sb_user', JSON.stringify(updated))
+    safeSetItem('sb_user', JSON.stringify(updated))
   }
 
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark'
     setTheme(newTheme)
-    localStorage.setItem('sb_theme', newTheme)
+    safeSetItem('sb_theme', newTheme)
     document.body.className = newTheme
   }
 
@@ -129,7 +137,7 @@ export function AppProvider({ children }) {
   }
 
   const loginUser = (userData) => {
-    localStorage.setItem('sb_user', JSON.stringify(userData))
+    safeSetItem('sb_user', JSON.stringify(userData))
     setUser(userData)
     setEcoCoins(userData.eco_coins || 0)
     setTotalScans(userData.total_scans || 0)
@@ -178,7 +186,7 @@ export function AppProvider({ children }) {
     await supabase.from('users').update({ eco_coins: newCoins, total_eco_coins_earned: (user.total_eco_coins_earned || 0) + amount, total_scans: totalScans + 1 }).eq('uid', user.uid)
     await supabase.from('transactions').insert({ user_id: user.uid, type: 'earn', amount, reason })
     const updated = { ...user, eco_coins: newCoins, total_scans: totalScans + 1 }
-    localStorage.setItem('sb_user', JSON.stringify(updated))
+    safeSetItem('sb_user', JSON.stringify(updated))
     setUser(updated); setEcoCoins(newCoins); setTotalScans(t => t + 1)
   }
 
@@ -194,7 +202,7 @@ export function AppProvider({ children }) {
     await supabase.from('users').update({ eco_coins: newCoins }).eq('uid', user.uid)
     await supabase.from('transactions').insert({ user_id: user.uid, type: 'redeem', amount, reason: rewardName })
     const updated = { ...user, eco_coins: newCoins }
-    localStorage.setItem('sb_user', JSON.stringify(updated))
+    safeSetItem('sb_user', JSON.stringify(updated))
     setUser(updated); setEcoCoins(newCoins)
   }
 
@@ -203,7 +211,7 @@ export function AppProvider({ children }) {
     if (user?.uid) {
       await supabase.from('users').update({ language: newLang }).eq('uid', user.uid)
       const updated = { ...user, language: newLang }
-      localStorage.setItem('sb_user', JSON.stringify(updated))
+      safeSetItem('sb_user', JSON.stringify(updated))
       setUser(updated)
     }
   }

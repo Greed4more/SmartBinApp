@@ -31,46 +31,4 @@ smartbin/
     └── schema.sql            # Supabase database setup SQL scripts
 ```
 
----
-
-## 💾 1. Database Setup (Supabase)
-
-1. Create a free project on [Supabase](https://supabase.com).
-2. Navigate to the **SQL Editor** tab in your dashboard.
-3. Paste the contents of `supabase/schema.sql` and click **Run**.
-4. Set up authentication keys in the client config libraries if swapping with production environments.
-
----
-
-## 🌐 2. Web Application Setup
-
-To run the React Web application:
-
-1. Open a terminal in the root directory:
-   ```bash
-   npm install
-   ```
-2. Start the local Vite development server:
-   ```bash
-   npm run dev
-   ```
-3. Open `http://localhost:5173` in your browser.
-
-*Note: The web app utilizes Leaflet maps and Face-API biometrics. It contains dynamic simulators for scanning items and enrolling facial biometric tensors without requiring local file assets or complex native plugins.*
-
----
-
-## 📱 3. Mobile Application Setup
-
-To run the Expo React Native application:
-
-1. Navigate to the `mobile/` subdirectory:
-   ```bash
-   cd mobile
-   npm install
-   ```
-2. Start the Expo builder:
-   ```bash
-   npx expo start
-   ```
-3. Scan the QR code with your iOS Camera app or the Android Expo Go client to launch the app!
+   

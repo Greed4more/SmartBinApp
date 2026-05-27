@@ -128,6 +128,15 @@ export function AppProvider({ children }) {
     if (data) setRecentScans(data)
   }
 
+  const loginUser = (userData) => {
+    localStorage.setItem('sb_user', JSON.stringify(userData))
+    setUser(userData)
+    setEcoCoins(userData.eco_coins || 0)
+    setTotalScans(userData.total_scans || 0)
+    setLanguage(userData.language || 'en')
+    subscribeRealtime(userData.uid)
+  }
+
   const login = async (email, password) => {
     setLoading(true)
     const emailKey = email.replace(/[.@]/g, '_')
@@ -135,10 +144,7 @@ export function AppProvider({ children }) {
     if (!emailRow) { setLoading(false); throw new Error('No account found') }
     const { data: userData } = await supabase.from('users').select('*').eq('uid', emailRow.uid).single()
     if (!userData || userData.password !== password) { setLoading(false); throw new Error('Incorrect password') }
-    localStorage.setItem('sb_user', JSON.stringify(userData))
-    setUser(userData); setEcoCoins(userData.eco_coins || 0); setTotalScans(userData.total_scans || 0)
-    setLanguage(userData.language || 'en')
-    subscribeRealtime(userData.uid)
+    loginUser(userData)
     setLoading(false)
     return userData
   }
@@ -210,7 +216,7 @@ export function AppProvider({ children }) {
       loading, language, changeLanguage, t: translate,
       theme, toggleTheme, faceVerified, setFaceVerified,
       notificationsEnabled, setNotificationsEnabled,
-      login, register, logout, addEcoCoins, saveScan, redeemCoins, updateUserProfile
+      login, register, logout, addEcoCoins, saveScan, redeemCoins, updateUserProfile, loginUser
     }}>
       {children}
     </AppContext.Provider>

@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext'
 import FaceIDScreen from './FaceIDScreen'
 
 export default function Auth() {
-  const { login, register, loading, setUser, t } = useApp()
+  const { login, register, loading, loginUser, t } = useApp()
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -38,11 +38,14 @@ export default function Auth() {
 
   const handleFaceSuccess = (userOrPhotoUrl) => {
     if (pendingUser) {
-      const finalUser = { ...pendingUser, photo_url: userOrPhotoUrl, face_id_enabled: true }
-      localStorage.setItem('sb_user', JSON.stringify(finalUser))
-      setUser(finalUser)
+      const finalUser = { 
+        ...pendingUser, 
+        photo_url: typeof userOrPhotoUrl === 'string' ? userOrPhotoUrl : null, 
+        face_id_enabled: typeof userOrPhotoUrl === 'string' ? true : false 
+      }
+      loginUser(finalUser)
     } else if (userOrPhotoUrl && typeof userOrPhotoUrl === 'object') {
-      setUser(userOrPhotoUrl)
+      loginUser(userOrPhotoUrl)
     }
     setShowFaceScan(false)
   }

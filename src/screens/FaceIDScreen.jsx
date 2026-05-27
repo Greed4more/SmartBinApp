@@ -260,6 +260,46 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
             {mode === 'setup' ? 'BEGIN REGISTRATION' : 'START VERIFY SCAN'}
           </button>
         )}
+
+        {phase === 'idle' && mode === 'setup' && (
+          <button
+            onClick={() => onSuccess(null)}
+            style={{
+              marginTop: 10, height: 36, width: '100%', fontSize: 11,
+              background: 'transparent', border: '1px solid rgba(255,255,255,0.2)',
+              color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', cursor: 'pointer', borderRadius: 8
+            }}
+          >
+            SKIP SETUP FOR NOW
+          </button>
+        )}
+
+        {phase === 'error' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button
+              onClick={() => {
+                setPhase('idle');
+                setStatusMsg('Position your face in the frame');
+              }}
+              className="scan-btn"
+              style={{ marginTop: 20, height: 44, width: '100%', fontSize: 14 }}
+            >
+              TRY AGAIN
+            </button>
+            {mode === 'setup' && (
+              <button
+                onClick={() => onSuccess(null)}
+                style={{
+                  height: 36, width: '100%', fontSize: 11,
+                  background: 'transparent', border: '1px solid rgba(255,255,255,0.2)',
+                  color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', cursor: 'pointer', borderRadius: 8
+                }}
+              >
+                SKIP SETUP FOR NOW
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

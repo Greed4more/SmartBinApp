@@ -76,7 +76,7 @@ function AppContent() {
         <ParticlesBg />
         <div className="texture" style={{ zIndex: 0 }} />
 
-        <ErrorBoundary fallback={<div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#E8C547' }}>[!] Reload to continue</div>}>
+        <ErrorBoundary>
           {renderScreen()}
         </ErrorBoundary>
 

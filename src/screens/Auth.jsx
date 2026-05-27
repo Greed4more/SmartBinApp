@@ -135,6 +135,16 @@ export default function Auth() {
           </button>
         </div>
       </div>
+
+      {showFaceScan && (
+        <FaceIDScreen
+          mode={faceMode}
+          targetUid={pendingUser?.uid}
+          onClose={() => setShowFaceScan(false)}
+          onSuccess={handleFaceSuccess}
+        />
+      )}
     </div>
   )
 }
+

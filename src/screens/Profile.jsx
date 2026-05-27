@@ -1,8 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { uploadToCloudinary } from '../utils/cloudinary';
 
 export default function Profile() {
-  const { user, logout, t, theme, toggleTheme, notificationsEnabled, setNotificationsEnabled } = useApp();
+  const { user, logout, t, theme, toggleTheme, notificationsEnabled, setNotificationsEnabled, updateUserProfile } = useApp();
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  // Form states
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [pincode, setPincode] = useState('');
+  const [address, setAddress] = useState('');
+  const [dob, setDob] = useState('');
+
+  // Initialize form states when user loads or isEditing changes
+  useEffect(() => {
+    if (user) {
+      setName(user.name || '');
+      setPhone(user.phone || '');
+      setEmail(user.email || '');
+      setPincode(user.pincode || '');
+      setAddress(user.address || '');
+      setDob(user.dob || '');
+    }
+  }, [user, isEditing]);
 
   const handleLogout = () => {
     logout();
@@ -12,8 +39,62 @@ export default function Profile() {
     window.dispatchEvent(new CustomEvent('changeTab', { detail: 'face-debug' }));
   };
 
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingPhoto(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        try {
+          const photoUrl = await uploadToCloudinary(reader.result);
+          await updateUserProfile({ photo_url: photoUrl });
+          setSuccessMsg('Profile photo updated successfully!');
+          setTimeout(() => setSuccessMsg(''), 3000);
+        } catch (err) {
+          setErrorMsg('Photo upload failed: ' + err.message);
+        } finally {
+          setUploadingPhoto(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      setErrorMsg('Failed to read image file.');
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      await updateUserProfile({
+        name,
+        phone,
+        email,
+        pincode,
+        address,
+        dob: dob || null
+      });
+      setSuccessMsg('Profile details updated successfully!');
+      setIsEditing(false);
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err) {
+      setErrorMsg('Failed to update details: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <div className="screen screen-fade" style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="screen screen-fade" style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto' }}>
       {/* Top Header */}
       <div className="topbar">
         <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, color: '#fff', letterSpacing: 1 }}>USER PROFILE</div>
@@ -22,17 +103,41 @@ export default function Profile() {
         </button>
       </div>
 
+      {/* Success/Error Notifications */}
+      {successMsg && (
+        <div className="card card-enter" style={{ background: 'rgba(74,124,78,0.2)', border: '1px solid #4A7C4E', color: '#6BBF6F', padding: 10, textAlign: 'center', fontSize: 10, fontWeight: 500 }}>
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="card card-enter" style={{ background: 'rgba(232,84,84,0.2)', border: '1px solid #E85454', color: '#E85454', padding: 10, textAlign: 'center', fontSize: 10, fontWeight: 500 }}>
+          {errorMsg}
+        </div>
+      )}
+
       {/* Avatar details card */}
-      <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px' }}>
-        <div style={{
-          width: 60, height: 60, borderRadius: '50%', overflow: 'hidden', border: '2px solid var(--yellow)',
-          background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }}>
-          {user?.photo_url ? (
-            <img src={user.photo_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          ) : (
-            <span style={{ fontSize: 24 }}>👤</span>
-          )}
+      <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px', position: 'relative' }}>
+        <div style={{ position: 'relative' }}>
+          <div style={{
+            width: 70, height: 70, borderRadius: '50%', overflow: 'hidden', border: '2px solid var(--yellow)',
+            background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            {uploadingPhoto ? (
+              <span style={{ fontSize: 20, animation: 'spin 2s linear infinite' }}>⏳</span>
+            ) : user?.photo_url ? (
+              <img src={user.photo_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <span style={{ fontSize: 28 }}>👤</span>
+            )}
+          </div>
+          <label style={{
+            position: 'absolute', bottom: -2, right: -2, width: 24, height: 24, borderRadius: '50%',
+            background: 'var(--yellow)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 11, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', border: '2px solid #1A1A18'
+          }}>
+            📷
+            <input type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} disabled={uploadingPhoto} />
+          </label>
         </div>
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>{user?.name || 'SmartBin Citizen'}</div>
@@ -43,17 +148,91 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* User Stats Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <div className="card" style={{ padding: 12 }}>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-muted)', textTransform: 'uppercase' }}>City / State</div>
-          <div style={{ fontSize: 12, fontWeight: 600, marginTop: 4, color: '#fff' }}>{user?.city || 'N/A'}, {user?.state || 'N/A'}</div>
+      {/* Edit Form Section */}
+      {isEditing ? (
+        <form onSubmit={handleSave} className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '16px 20px' }}>
+          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--yellow)', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: 8, marginBottom: 4 }}>EDIT DETAILS</h3>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-muted)' }}>NAME</label>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={{ background: '#2A2A28', border: '1px solid #444', borderRadius: 6, padding: 8, color: '#fff', fontSize: 12 }} required />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-muted)' }}>PHONE</label>
+              <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ background: '#2A2A28', border: '1px solid #444', borderRadius: 6, padding: 8, color: '#fff', fontSize: 12 }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-muted)' }}>PINCODE</label>
+              <input type="text" value={pincode} onChange={(e) => setPincode(e.target.value)} style={{ background: '#2A2A28', border: '1px solid #444', borderRadius: 6, padding: 8, color: '#fff', fontSize: 12 }} />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-muted)' }}>EMAIL ID</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ background: '#2A2A28', border: '1px solid #444', borderRadius: 6, padding: 8, color: '#fff', fontSize: 12 }} required />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-muted)' }}>ADDRESS</label>
+            <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} style={{ background: '#2A2A28', border: '1px solid #444', borderRadius: 6, padding: 8, color: '#fff', fontSize: 12 }} />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-muted)' }}>DATE OF BIRTH</label>
+            <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} style={{ background: '#2A2A28', border: '1px solid #444', borderRadius: 6, padding: 8, color: '#fff', fontSize: 12 }} />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+            <button type="submit" disabled={saving} className="scan-btn" style={{ flex: 1, height: 38, fontSize: 12 }}>
+              {saving ? 'SAVING...' : 'SAVE CHANGES'}
+            </button>
+            <button type="button" onClick={() => setIsEditing(false)} className="scan-btn" style={{ flex: 1, height: 38, fontSize: 12, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid var(--border)' }}>
+              CANCEL
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* User Details display card */}
+          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '16px 20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-muted)' }}>PROFILE INFORMATION</span>
+              <button onClick={() => setIsEditing(true)} style={{ background: 'none', border: 'none', color: 'var(--yellow)', fontSize: 10, fontFamily: 'var(--font-mono)', cursor: 'pointer', textTransform: 'uppercase' }}>
+                [ EDIT DETAILS ]
+              </button>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 12 }}>
+              <div>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-muted)' }}>Phone Number</span>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginTop: 2 }}>{user?.phone || 'Not added'}</div>
+              </div>
+              <div>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-muted)' }}>Pincode</span>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginTop: 2 }}>{user?.pincode || 'Not added'}</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-muted)' }}>Date of Birth</span>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginTop: 2 }}>{user?.dob || 'Not added'}</div>
+              </div>
+              <div>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-muted)' }}>City / State</span>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginTop: 2 }}>{(user?.city || user?.state) ? `${user?.city || ''}, ${user?.state || ''}` : 'Not added'}</div>
+              </div>
+            </div>
+
+            <div>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-muted)' }}>Address</span>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginTop: 2, lineHeight: 1.3 }}>{user?.address || 'Not added'}</div>
+            </div>
+          </div>
         </div>
-        <div className="card" style={{ padding: 12 }}>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Pincode</div>
-          <div style={{ fontSize: 12, fontWeight: 600, marginTop: 4, color: '#fff' }}>{user?.pincode || 'N/A'}</div>
-        </div>
-      </div>
+      )}
 
       {/* Application Control center */}
       <div className="section-label" style={{ marginTop: 8 }}>SETTINGS & PREFERENCES</div>

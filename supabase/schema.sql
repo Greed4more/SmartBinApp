@@ -9,6 +9,7 @@ create table if not exists users (
   city text,
   pincode text,
   dob date,
+  address text,
   eco_coins int default 0,
   total_scans int default 0,
   total_eco_coins_earned int default 0,

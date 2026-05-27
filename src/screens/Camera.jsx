@@ -33,8 +33,18 @@ export default function Camera() {
       streamRef.current = stream;
       setStreamActive(true);
     } catch (err) {
-      console.warn('Webcam initialization failed:', err);
-      setStreamActive(false);
+      console.warn('Rear camera failed, trying default camera:', err);
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+        streamRef.current = stream;
+        setStreamActive(true);
+      } catch (err2) {
+        console.warn('Webcam initialization failed:', err2);
+        setStreamActive(false);
+      }
     }
   };
 

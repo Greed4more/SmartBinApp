@@ -84,6 +84,14 @@ export function AppProvider({ children }) {
 
   const updateUserProfile = async (updates) => {
     if (!user?.uid) throw new Error('Not logged in')
+    
+    if (updates.email && updates.email !== user.email) {
+      const oldEmailKey = user.email.replace(/[.@]/g, '_')
+      const newEmailKey = updates.email.replace(/[.@]/g, '_')
+      await supabase.from('user_emails').delete().eq('email_key', oldEmailKey)
+      await supabase.from('user_emails').insert({ email_key: newEmailKey, uid: user.uid, email: updates.email })
+    }
+
     const { error } = await supabase.from('users').update(updates).eq('uid', user.uid)
     if (error) throw error
     const updated = { ...user, ...updates }

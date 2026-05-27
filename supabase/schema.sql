@@ -72,3 +72,11 @@ create table if not exists bins (
 insert into bins (id, name, address, latitude, longitude, fill_level, dry, wet, metal)
 values ('main_bin', 'SmartBin Demo Hub', 'New Delhi Central District', 28.6139, 77.2090, 45, 45, 30, 20)
 on conflict (id) do nothing;
+
+-- Disable Row Level Security (RLS) to ensure direct frontend access for the demo
+alter table users disable row level security;
+alter table user_emails disable row level security;
+alter table scans disable row level security;
+alter table transactions disable row level security;
+alter table bins disable row level security;
+

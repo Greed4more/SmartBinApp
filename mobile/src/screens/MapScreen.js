@@ -161,6 +161,8 @@ export default function MapScreen() {
     return '#E85454';
   };
 
+  const isStale = lastUpdated && (new Date() - lastUpdated) > 60000;
+
   return (
     <View style={styles.container}>
       {/* Full-screen MapView */}
@@ -168,7 +170,6 @@ export default function MapScreen() {
         ref={mapRef}
         style={styles.map}
         initialRegion={region}
-        userInterfaceStyle="dark"
         showsUserLocation={true}
         showsMyLocationButton={true}
       >
@@ -189,11 +190,23 @@ export default function MapScreen() {
 
       {/* Floating Status Bar Overlay */}
       <View style={styles.statusHeader}>
-        <View style={[styles.statusDot, { backgroundColor: getStatusColor() }]} />
+        <View style={[styles.statusDot, { backgroundColor: isStale ? '#E85454' : getStatusColor() }]} />
         <Text style={styles.statusText}>
-          GPS STATUS: <Text style={{ fontWeight: 'bold' }}>{connectionStatus}</Text>
+          GPS STATUS: <Text style={{ fontWeight: 'bold' }}>{isStale ? 'STALE / OFFLINE' : connectionStatus}</Text>
         </Text>
       </View>
+
+      {/* Offline/Stale Signal Warning Banner */}
+      {isStale && (
+        <View style={styles.warningBanner}>
+          <Text style={styles.warningText}>
+            ⚠️ GPS HARDWARE OFFLINE OR HAS NO SATELLITE LOCK
+          </Text>
+          <Text style={styles.warningSub}>
+            Make sure your hardware is powered on, has WiFi, and has a clear sky view outdoors. Showing last saved location.
+          </Text>
+        </View>
+      )}
 
       {/* Floating Telemetry Panel */}
       <View style={styles.telemetryCard}>
@@ -450,5 +463,36 @@ const styles = StyleSheet.create({
     backgroundColor: '#E8C547',
     borderWidth: 1.5,
     borderColor: '#fff',
+  },
+  warningBanner: {
+    position: 'absolute',
+    top: 96,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(232,84,84,0.95)',
+    borderWidth: 1,
+    borderColor: '#E85454',
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  warningText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    fontFamily: 'monospace',
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  warningSub: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 8,
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 11,
   },
 });

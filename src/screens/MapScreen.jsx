@@ -125,9 +125,9 @@ export default function MapScreen() {
         zoomControl: false
       });
 
-      // Premium Dark theme tiles from CartoDB
-      window.L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+      // Standard detailed street map tiles showing all names and places
+      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(leafletMap.current);
 
       window.L.control.zoom({
@@ -246,7 +246,10 @@ export default function MapScreen() {
     return () => clearInterval(interval);
   }, [lastUpdated]);
 
+  const isStale = lastUpdated && (new Date() - lastUpdated) > 60000;
+
   const getStatusColor = () => {
+    if (isStale) return '#E85454';
     if (connectionStatus === 'CONNECTED') return '#6BBF6F';
     if (connectionStatus === 'CONNECTING...' || connectionStatus === 'RECONNECTING...') return '#E8C547';
     return '#E85454';
@@ -263,7 +266,7 @@ export default function MapScreen() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(26,26,24,0.95)', border: '1px solid rgba(255,255,255,0.08)', padding: '6px 12px', borderRadius: 20 }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: getStatusColor() }}></div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: '#fff', letterSpacing: 0.5 }}>
-            GPS STATUS: <b>{connectionStatus}</b>
+            GPS STATUS: <b>{isStale ? 'STALE / OFFLINE' : connectionStatus}</b>
           </div>
         </div>
       </div>
@@ -271,6 +274,29 @@ export default function MapScreen() {
       {/* Map Content Viewport */}
       <div style={{ flex: 1, position: 'relative', margin: '16px 20px 24px 20px', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--border)' }}>
         <div ref={mapRef} style={{ width: '100%', height: '100%', background: '#1A1A18' }} />
+
+        {/* Offline/Stale Signal Warning Banner */}
+        {isStale && (
+          <div style={{
+            position: 'absolute',
+            top: 20,
+            left: 20,
+            right: 20,
+            backgroundColor: 'rgba(232, 84, 84, 0.95)',
+            border: '1px solid #E85454',
+            borderRadius: 12,
+            padding: '12px 16px',
+            color: '#fff',
+            zIndex: 1000,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 'bold' }}>⚠️ GPS HARDWARE OFFLINE OR NO SATELLITE LOCK</div>
+            <div style={{ fontSize: 8, opacity: 0.85, marginTop: 4, lineHeight: 1.4 }}>
+              The ESP32 tracking module is currently not sending coordinates. Check that the device is powered on, connected to WiFi, and has a clear sky view outdoors. Showing last saved location.
+            </div>
+          </div>
+        )}
 
         {/* Floating Telemetry Panel */}
         {dustbinLoc && (

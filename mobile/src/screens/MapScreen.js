@@ -190,23 +190,11 @@ export default function MapScreen() {
 
       {/* Floating Status Bar Overlay */}
       <View style={styles.statusHeader}>
-        <View style={[styles.statusDot, { backgroundColor: isStale ? '#E85454' : getStatusColor() }]} />
+        <View style={[styles.statusDot, { backgroundColor: getStatusColor() }]} />
         <Text style={styles.statusText}>
-          GPS STATUS: <Text style={{ fontWeight: 'bold' }}>{isStale ? 'STALE / OFFLINE' : connectionStatus}</Text>
+          GPS STATUS: <Text style={{ fontWeight: 'bold' }}>{connectionStatus}</Text>
         </Text>
       </View>
-
-      {/* Offline/Stale Signal Warning Banner */}
-      {isStale && (
-        <View style={styles.warningBanner}>
-          <Text style={styles.warningText}>
-            ⚠️ GPS HARDWARE OFFLINE OR HAS NO SATELLITE LOCK
-          </Text>
-          <Text style={styles.warningSub}>
-            Make sure your hardware is powered on, has WiFi, and has a clear sky view outdoors. Showing last saved location.
-          </Text>
-        </View>
-      )}
 
       {/* Floating Telemetry Panel */}
       <View style={styles.telemetryCard}>

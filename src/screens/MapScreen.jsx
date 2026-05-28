@@ -246,7 +246,7 @@ export default function MapScreen() {
     return () => clearInterval(interval);
   }, [lastUpdated]);
 
-  const isStale = lastUpdated && (new Date() - lastUpdated) > 60000;
+  const isStale = lastUpdated && (new Date() - lastUpdated) > 600000;
 
   const getStatusColor = () => {
     if (isStale) return '#E85454';

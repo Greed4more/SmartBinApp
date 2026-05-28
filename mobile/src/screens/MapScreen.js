@@ -161,7 +161,7 @@ export default function MapScreen() {
     return '#E85454';
   };
 
-  const isStale = lastUpdated && (new Date() - lastUpdated) > 60000;
+  const isStale = lastUpdated && (new Date() - lastUpdated) > 600000;
 
   return (
     <View style={styles.container}>

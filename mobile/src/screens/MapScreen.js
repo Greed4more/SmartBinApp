@@ -32,9 +32,9 @@ export default function MapScreen() {
       setError(null);
       
       const { data, error: fetchErr } = await supabase
-        .from('dustbin_locations')
+        .from('bins')
         .select('*')
-        .eq('id', 1)
+        .eq('id', 'main_bin')
         .single();
         
       if (fetchErr) throw fetchErr;
@@ -43,7 +43,7 @@ export default function MapScreen() {
         setDustbinLoc(data);
         setLastUpdated(new Date(data.updated_at || Date.now()));
       } else {
-        throw new Error("No tracking record found with ID = 1");
+        throw new Error("No tracking record found with ID = main_bin");
       }
     } catch (e) {
       console.warn("Initial fetch failed:", e.message);
@@ -68,8 +68,8 @@ export default function MapScreen() {
         {
           event: '*', // Listen to all updates/inserts
           schema: 'public',
-          table: 'dustbin_locations',
-          filter: 'id=eq.1'
+          table: 'bins',
+          filter: 'id=eq.main_bin'
         },
         (payload) => {
           console.log('Live coordinate update:', payload.new);

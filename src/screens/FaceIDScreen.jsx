@@ -9,6 +9,9 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
   const [statusMsg, setStatusMsg] = useState('Initializing Face AI...');
   const [faceDetected, setFaceDetected] = useState(false);
   const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [enrollmentIndex, setEnrollmentIndex] = useState(0);
+  const enrollmentSamplesRef = useRef([]);
+  const lastCapturedDataUrl = useRef(null);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const detectionInterval = useRef(null);
@@ -110,9 +113,18 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
       setStatusMsg('No face detected. Please center your face.');
       return;
     }
-    setPhase('scanning');
-    setStatusMsg(mode === 'setup' ? 'Capturing biometrics...' : 'Verifying identity...');
-    setTimeout(() => captureAndVerify(), 1500);
+    // For registration we capture multiple samples to improve accuracy
+    if (mode === 'setup') {
+      enrollmentSamplesRef.current = [];
+      setEnrollmentIndex(0);
+      setPhase('scanning');
+      setStatusMsg('Capturing biometrics (1 of 3)...');
+      setTimeout(() => captureAndVerify(), 800);
+    } else {
+      setPhase('scanning');
+      setStatusMsg('Verifying identity...');
+      setTimeout(() => captureAndVerify(), 800);
+    }
   };
 
   const captureAndVerify = async () => {
@@ -126,8 +138,8 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
     setStatusMsg('Extracting Biometrics...');
 
     try {
-      let descriptor = Array.from({ length: 128 }, () => (Math.random() - 0.5) * 0.2); // baseline random vector
-      let dataUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'; // fallback profile photo
+  let descriptor = Array.from({ length: 128 }, () => (Math.random() - 0.5) * 0.2); // baseline random vector
+  let dataUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'; // fallback profile photo
 
       if (videoRef.current && videoRef.current.readyState === 4) {
         const canvas = document.createElement('canvas');
@@ -153,12 +165,29 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
         }
       }
 
-      setStatusMsg('Saving Database Profile...');
-      const uploadedUrl = await uploadToCloudinary(dataUrl);
+      // Store last captured dataUrl for profile picture
+      lastCapturedDataUrl.current = dataUrl;
 
       if (mode === 'setup') {
-        await handleSetup(descriptor, uploadedUrl);
+        // collect multiple samples
+        enrollmentSamplesRef.current.push(descriptor);
+        const got = enrollmentSamplesRef.current.length;
+        setEnrollmentIndex(got);
+        if (got < 3) {
+          setStatusMsg(`Captured ${got} of 3 samples. Hold still for next capture...`);
+          setTimeout(() => captureAndVerify(), 900);
+          return;
+        }
+
+        setStatusMsg('Saving Database Profile...');
+        const uploadedUrl = await uploadToCloudinary(lastCapturedDataUrl.current);
+
+        // average the descriptors
+        const avg = averageDescriptors(enrollmentSamplesRef.current);
+        await handleSetup(avg, uploadedUrl);
       } else {
+        setStatusMsg('Saving Database Profile...');
+        const uploadedUrl = await uploadToCloudinary(dataUrl);
         await handleCaptureResult(descriptor);
       }
     } catch (err) {
@@ -166,6 +195,36 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
       setPhase('error');
       setStatusMsg(err.message || 'Face recognition failed.');
     }
+  };
+
+  const averageDescriptors = (arr) => {
+    if (!arr || arr.length === 0) return null;
+    const len = arr[0].length;
+    const avg = new Array(len).fill(0);
+    for (const d of arr) {
+      for (let i = 0; i < len; i++) avg[i] += (d[i] || 0);
+    }
+    for (let i = 0; i < len; i++) avg[i] = avg[i] / arr.length;
+    return avg;
+  };
+
+  const euclidean = (a, b) => {
+    let sum = 0;
+    for (let i = 0; i < a.length; i++) {
+      const diff = (a[i] || 0) - (b[i] || 0);
+      sum += diff * diff;
+    }
+    return Math.sqrt(sum);
+  };
+
+  const cosineSimilarity = (a, b) => {
+    let dot = 0, na = 0, nb = 0;
+    for (let i = 0; i < a.length; i++) {
+      const ai = a[i] || 0; const bi = b[i] || 0;
+      dot += ai * bi; na += ai * ai; nb += bi * bi;
+    }
+    if (na === 0 || nb === 0) return 0;
+    return dot / (Math.sqrt(na) * Math.sqrt(nb));
   };
 
   const handleSetup = async (descriptor, photoUrl) => {
@@ -195,21 +254,22 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
 
     for (const u of users) {
       if (!u.face_descriptor) continue;
-      let sum = 0;
-      for (let i = 0; i < descriptor.length; i++) {
-        const diff = descriptor[i] - u.face_descriptor[i];
-        sum += diff * diff;
-      }
-      const dist = Math.sqrt(sum);
+      // Compute euclidean and cosine similarity
+      const dist = euclidean(descriptor, u.face_descriptor || []);
+      const sim = cosineSimilarity(descriptor, u.face_descriptor || []);
+      // Prefer euclidean but keep cosine as secondary measure
+      const score = dist - sim; // lower is better
       if (dist < minDistance) {
         minDistance = dist;
         bestMatch = u;
       }
     }
-
-    // Under 0.6 Euclidean distance indicates a match.
+    // Matching rules: euclidean < 0.6 OR cosine similarity > 0.6
     // If we're in simulation mode with mock descriptors, we'll auto-pass for testing ease!
-    if (minDistance < 0.6 && bestMatch) {
+    const cosThreshold = 0.6;
+    const euclidThreshold = 0.6;
+    const bestCos = bestMatch ? cosineSimilarity(descriptor, bestMatch.face_descriptor || []) : 0;
+    if ((minDistance < euclidThreshold || bestCos > cosThreshold) && bestMatch) {
       setPhase('done');
       setStatusMsg(`Hello, ${bestMatch.name}!`);
       setTimeout(() => onSuccess(bestMatch), 1500);

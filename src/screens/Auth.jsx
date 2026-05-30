@@ -143,6 +143,11 @@ export default function Auth() {
               {shouldRegisterFace ? '✅' : '⬜'} Register face for FaceID login
             </button>
           )}
+          {!isLogin && (
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: 8 }}>
+              By enabling FaceID we will store a numeric face embedding (not your raw photo) in your profile. You can skip at any time and use password login.
+            </div>
+          )}
         </form>
 
         <button

@@ -79,7 +79,17 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.onplay = () => startDetection();
+        // Some browsers require calling play(); attempt and fall back to onplay
+        try {
+          const p = videoRef.current.play();
+          if (p && p.then) {
+            p.then(() => startDetection()).catch(() => { videoRef.current.onplay = () => startDetection(); });
+          } else {
+            videoRef.current.onplay = () => startDetection();
+          }
+        } catch (e) {
+          videoRef.current.onplay = () => startDetection();
+        }
       }
       streamRef.current = stream;
     } catch (err) {

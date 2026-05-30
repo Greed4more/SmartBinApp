@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { uploadToCloudinary } from '../utils/cloudinary';
+import FaceIDScreen from './FaceIDScreen';
+import { supabase } from '../lib/supabase';
 
 export default function Profile() {
   const { user, logout, t, theme, toggleTheme, notificationsEnabled, setNotificationsEnabled, updateUserProfile } = useApp();
@@ -10,6 +12,8 @@ export default function Profile() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [showFaceModal, setShowFaceModal] = useState(false);
+  const [faceMode, setFaceMode] = useState('setup');
 
   // Form states
   const [name, setName] = useState('');
@@ -102,6 +106,22 @@ export default function Profile() {
           {t('logout')}
         </button>
       </div>
+      {showFaceModal && (
+        <FaceIDScreen
+          mode={faceMode}
+          targetUid={user?.uid}
+          onClose={() => setShowFaceModal(false)}
+          onSuccess={async (result) => {
+            setShowFaceModal(false);
+            try {
+              const { data } = await supabase.from('users').select('*').eq('uid', user.uid).single();
+              if (data) updateUserProfile({ ...data });
+            } catch (err) {
+              setErrorMsg('Failed to refresh profile: ' + err.message);
+            }
+          }}
+        />
+      )}
 
       {/* Success/Error Notifications */}
       {successMsg && (
@@ -138,6 +158,30 @@ export default function Profile() {
             📷
             <input type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} disabled={uploadingPhoto} />
           </label>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {user?.face_id_enabled ? (
+            <>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>FaceID: Enabled</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => { setFaceMode('setup'); setShowFaceModal(true); }} style={{ background: 'rgba(232,197,71,0.08)', border: '1px solid var(--yellow)', color: 'var(--yellow)', padding: '8px 12px', borderRadius: 8, cursor: 'pointer' }}>Re-enrol Face</button>
+                <button onClick={async () => {
+                  // remove face descriptor from DB
+                  setErrorMsg('');
+                  try {
+                    await supabase.from('users').update({ face_descriptor: null, face_id_enabled: false }).eq('uid', user.uid);
+                    // fetch latest profile and update
+                    const { data } = await supabase.from('users').select('*').eq('uid', user.uid).single();
+                    if (data) updateUserProfile({ ...data });
+                  } catch (err) {
+                    setErrorMsg('Failed to remove FaceID: ' + err.message);
+                  }
+                }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', color: 'var(--text-muted)', padding: '8px 12px', borderRadius: 8, cursor: 'pointer' }}>Remove Face</button>
+              </div>
+            </>
+          ) : (
+            <button onClick={() => { setFaceMode('setup'); setShowFaceModal(true); }} style={{ background: 'rgba(232,197,71,0.08)', border: '1px solid var(--yellow)', color: 'var(--yellow)', padding: '8px 12px', borderRadius: 8, cursor: 'pointer' }}>Register Face</button>
+          )}
         </div>
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>{user?.name || 'SmartBin Citizen'}</div>

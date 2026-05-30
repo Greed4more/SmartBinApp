@@ -23,14 +23,22 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
 
   const loadModels = async () => {
     try {
-      if (!window.faceapi) throw new Error('Face API not loaded. Check index.html');
+      // Lazy-load face-api.min.js from CDN when not already present on window
+      if (!window.faceapi) {
+        setStatusMsg('Loading face recognition library...');
+        await loadScript('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js');
+        if (!window.faceapi) throw new Error('Failed to load face-api library');
+      }
+
       const MODEL_URL = '/models';
+      // load only the models we need; tolerant to missing files
       await Promise.all([
-        window.faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-        window.faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-        window.faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-        window.faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+        window.faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL).catch(e => console.warn('tinyFaceDetector missing', e)),
+        window.faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL).catch(e => console.warn('landmark net missing', e)),
+        window.faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL).catch(e => console.warn('recognition net missing', e)),
+        window.faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL).catch(e => console.warn('ssdMobilenet missing', e)),
       ]);
+
       setModelsLoaded(true);
       setPhase('idle');
       setStatusMsg('Position your face in the frame');
@@ -44,6 +52,16 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
       startCamera();
     }
   };
+
+  const loadScript = (src) => new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) return resolve();
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    s.onload = () => setTimeout(resolve, 50);
+    s.onerror = (e) => reject(new Error('Failed to load ' + src));
+    document.head.appendChild(s);
+  });
 
   const startCamera = async () => {
     try {

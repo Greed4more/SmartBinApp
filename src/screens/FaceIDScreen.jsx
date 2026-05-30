@@ -348,6 +348,7 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
 
     let bestMatch = null;
     let minDistance = 999;
+    const debugResults = [];
 
     for (const u of users) {
       if (!u.face_descriptor) continue;
@@ -356,11 +357,13 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
       const sim = cosineSimilarity(descriptor, u.face_descriptor || []);
       // Prefer euclidean but keep cosine as secondary measure
       const score = dist - sim; // lower is better
+      debugResults.push({ uid: u.uid, name: u.name || u.email || 'user', dist, sim });
       if (dist < minDistance) {
         minDistance = dist;
         bestMatch = u;
       }
     }
+    console.info('Face verify debug results:', debugResults);
     // Matching rules: euclidean < 0.6 OR cosine similarity > 0.6
     // If we're in simulation mode with mock descriptors, we'll auto-pass for testing ease!
     const cosThreshold = 0.6;
@@ -368,15 +371,18 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
     const bestCos = bestMatch ? cosineSimilarity(descriptor, bestMatch.face_descriptor || []) : 0;
     if ((minDistance < euclidThreshold || bestCos > cosThreshold) && bestMatch) {
       setPhase('done');
-      setStatusMsg(`Hello, ${bestMatch.name}!`);
+      setStatusMsg(`Hello, ${bestMatch.name || 'User'}! (dist=${minDistance.toFixed(3)}, cos=${bestCos.toFixed(3)})`);
       setSuccessPayload(bestMatch);
     } else if (!modelsLoaded && users.length > 0) {
       // Simulator Auto-match convenience bypass
       const fallbackUser = users[0];
       setPhase('done');
-      setStatusMsg(`Auto-Match: Welcome, ${fallbackUser.name}!`);
+      setStatusMsg(`Auto-Match: Welcome, ${fallbackUser.name || 'User'}!`);
       setSuccessPayload(fallbackUser);
     } else {
+      // Show numeric feedback to help debugging
+      setStatusMsg(`Identity not verified. minDist=${minDistance.toFixed(3)} bestCos=${bestCos.toFixed(3)} (thresholds: euclid<${euclidThreshold}, cos>${cosThreshold})`);
+      console.warn('Face verification failed:', { minDistance, bestCos, thresholds: { euclidThreshold, cosThreshold }, debugResults });
       throw new Error('Identity not verified. Try again.');
     }
   };
@@ -479,6 +485,9 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
             >
               TRY AGAIN
             </button>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, textAlign: 'center' }}>
+              Tip: Ensure good lighting, remove sunglasses, hold the phone steady and position your face within the circle.
+            </div>
             {mode === 'setup' && (
               <button
                 onClick={() => onSuccess(null)}

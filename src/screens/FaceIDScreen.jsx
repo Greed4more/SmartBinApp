@@ -380,11 +380,94 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
       setStatusMsg(`Auto-Match: Welcome, ${fallbackUser.name || 'User'}!`);
       setSuccessPayload(fallbackUser);
     } else {
+      // Try image-based fallback: compare captured image to stored profile photos using perceptual dHash
+      try {
+        setStatusMsg('Trying image-based fallback...');
+        // capture current video frame to dataUrl
+        const fallbackMatches = [];
+        // create image data url from last capture if available
+        const capturedDataUrl = lastCapturedDataUrl.current;
+        if (capturedDataUrl) {
+          for (const u of users) {
+            if (!u.photo_url) continue;
+            try {
+              const dist = await compareImagesByDHash(capturedDataUrl, u.photo_url);
+              console.info('Image dHash distance for', u.uid, dist);
+              // threshold empirically tuned (lower is more similar); 12 is moderately permissive
+              if (dist <= 12) {
+                fallbackMatches.push({ user: u, dist });
+              }
+            } catch (e) {
+              console.warn('Image compare failed for', u.uid, e);
+            }
+          }
+        }
+        if (fallbackMatches.length > 0) {
+          // pick best image match
+          fallbackMatches.sort((a, b) => a.dist - b.dist);
+          const best = fallbackMatches[0];
+          setPhase('done');
+          setStatusMsg(`Image-match: Welcome, ${best.user.name || 'User'}! (dh=${best.dist})`);
+          setSuccessPayload(best.user);
+          return;
+        }
+      } catch (e) {
+        console.warn('Image fallback error:', e);
+      }
       // Show numeric feedback to help debugging
       setStatusMsg(`Identity not verified. minDist=${minDistance.toFixed(3)} bestCos=${bestCos.toFixed(3)} (thresholds: euclid<${euclidThreshold}, cos>${cosThreshold})`);
       console.warn('Face verification failed:', { minDistance, bestCos, thresholds: { euclidThreshold, cosThreshold }, debugResults });
       throw new Error('Identity not verified. Try again.');
     }
+  };
+
+  // --- Image dHash helpers ---
+  const loadImage = (src) => new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = (e) => reject(e);
+    img.src = src;
+  });
+
+  const computeDHash = async (dataUrl) => {
+    // dHash: resize to 9x8, grayscale, compare adjacent columns -> 8x8 bits = 64-bit hash
+    const img = await loadImage(dataUrl);
+    const w = 9, h = 8;
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, w, h);
+    const px = ctx.getImageData(0, 0, w, h).data;
+    const gray = [];
+    for (let i = 0; i < px.length; i += 4) {
+      const r = px[i], g = px[i + 1], b = px[i + 2];
+      gray.push(0.299 * r + 0.587 * g + 0.114 * b);
+    }
+    const bits = [];
+    for (let row = 0; row < h; row++) {
+      for (let col = 0; col < w - 1; col++) {
+        const left = gray[row * w + col];
+        const right = gray[row * w + col + 1];
+        bits.push(right > left ? 1 : 0);
+      }
+    }
+    return bits.join('');
+  };
+
+  const hammingDistance = (a, b) => {
+    if (!a || !b || a.length !== b.length) return Infinity;
+    let d = 0;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) d++;
+    return d;
+  };
+
+  const compareImagesByDHash = async (dataUrlA, urlB) => {
+    const hashA = await computeDHash(dataUrlA);
+    // if urlB is already a data URL, use directly; otherwise load remote image
+    const imgBUrl = urlB.startsWith('data:') ? urlB : urlB;
+    const hashB = await computeDHash(imgBUrl);
+    return hammingDistance(hashA, hashB);
   };
 
   return (

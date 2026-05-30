@@ -82,12 +82,12 @@ export async function detectWaste(imageDataUrl) {
     console.warn('Vision API failed, using fallback detection:', err);
   }
   
-  // Fallback: Use TensorFlow.js for client-side detection
+  // Fallback: Use color analysis and simple detection
   try {
-    const result = await detectWithTensorFlow(imageDataUrl);
+    const result = await detectWithColorAnalysis(imageDataUrl);
     if (result) return result;
   } catch (err) {
-    console.warn('TensorFlow detection failed:', err);
+    console.warn('Color analysis failed:', err);
   }
   
   // Last resort: Return unknown
@@ -151,33 +151,90 @@ async function detectWithVisionAPI(imageDataUrl) {
 }
 
 /**
- * Detect waste using TensorFlow.js COCO-SSD model
+ * Detect waste using simple color and brightness analysis
+ * Works entirely in browser without external dependencies
  */
-async function detectWithTensorFlow(imageDataUrl) {
+async function detectWithColorAnalysis(imageDataUrl) {
   try {
-    // Dynamically load TensorFlow libraries
-    const tf = window.tf || await import('@tensorflow/tfjs');
-    const cocoSsd = await import('@tensorflow-models/coco-ssd');
-    
-    const model = await cocoSsd.load();
-    
-    // Create image element from data URL
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
     const img = document.createElement('img');
+    
     img.src = imageDataUrl;
     
-    const predictions = await model.detect(img);
-    console.log('TensorFlow detections:', predictions);
-    
-    // Extract class names and find waste match
-    for (const pred of predictions) {
-      const itemName = pred.class.toLowerCase();
-      const match = findWasteMatch(itemName);
-      if (match) return match;
-    }
+    return new Promise((resolve) => {
+      img.onload = () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        
+        // Calculate average color
+        let r = 0, g = 0, b = 0, count = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          r += data[i];
+          g += data[i + 1];
+          b += data[i + 2];
+          count++;
+        }
+        
+        r = Math.round(r / count);
+        g = Math.round(g / count);
+        b = Math.round(b / count);
+        
+        console.log(`Detected colors: R=${r}, G=${g}, B=${b}`);
+        
+        // Analyze dominant color to guess waste type
+        const result = analyzeWasteByColor(r, g, b);
+        resolve(result);
+      };
+      
+      img.onerror = () => resolve(null);
+    });
   } catch (err) {
-    console.error('TensorFlow detection error:', err);
+    console.error('Color analysis error:', err);
+    return null;
+  }
+}
+
+/**
+ * Guess waste type based on dominant color
+ */
+function analyzeWasteByColor(r, g, b) {
+  // Calculate brightness
+  const brightness = (r + g + b) / 3;
+  
+  // Determine dominant color
+  let maxChannel = Math.max(r, g, b);
+  
+  // Green dominant - likely organic/plant waste
+  if (g > r * 1.2 && g > b * 1.2) {
+    return classifyWaste('banana peel');
   }
   
+  // Gray/silver dominant - likely metal
+  if (Math.abs(r - g) < 30 && Math.abs(g - b) < 30 && brightness > 100) {
+    return classifyWaste('soda can');
+  }
+  
+  // Brown dominant - likely paper/cardboard
+  if (r > g * 1.1 && r > b * 1.1 && g > b * 0.9) {
+    return classifyWaste('cardboard box');
+  }
+  
+  // Clear/white dominant - likely plastic or glass
+  if (brightness > 180) {
+    return classifyWaste('water bottle');
+  }
+  
+  // Dark dominant - could be many things, default to unknown
+  if (brightness < 80) {
+    return classifyWaste('unknown');
+  }
+  
+  // Default fallback
   return null;
 }
 

@@ -182,6 +182,10 @@ export default function Profile() {
           ) : (
             <button onClick={() => { setFaceMode('setup'); setShowFaceModal(true); }} style={{ background: 'rgba(232,197,71,0.08)', border: '1px solid var(--yellow)', color: 'var(--yellow)', padding: '8px 12px', borderRadius: 8, cursor: 'pointer' }}>Register Face</button>
           )}
+          {/* Always-visible manage control in case flags are out-of-sync or user needs to enroll */}
+          <div style={{ marginTop: 8 }}>
+            <button onClick={() => { setFaceMode('setup'); setShowFaceModal(true); }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', color: 'var(--text-muted)', padding: '8px 12px', borderRadius: 8, cursor: 'pointer' }}>Manage FaceID</button>
+          </div>
         </div>
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>{user?.name || 'SmartBin Citizen'}</div>

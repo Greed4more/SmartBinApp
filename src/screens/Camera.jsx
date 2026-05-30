@@ -29,6 +29,15 @@ export default function Camera() {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        // Ensure video element is properly configured for playback
+        videoRef.current.setAttribute('playsinline', '');
+        videoRef.current.setAttribute('autoplay', '');
+        videoRef.current.setAttribute('muted', '');
+        
+        // Ensure video plays once stream is loaded
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current.play().catch(err => console.warn('Autoplay failed:', err));
+        };
       }
       streamRef.current = stream;
       setStreamActive(true);
@@ -38,11 +47,20 @@ export default function Camera() {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          // Ensure video element is properly configured for playback
+          videoRef.current.setAttribute('playsinline', '');
+          videoRef.current.setAttribute('autoplay', '');
+          videoRef.current.setAttribute('muted', '');
+          
+          // Ensure video plays once stream is loaded
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current.play().catch(err => console.warn('Autoplay failed:', err));
+          };
         }
         streamRef.current = stream;
         setStreamActive(true);
       } catch (err2) {
-        console.warn('Webcam initialization failed:', err2);
+        console.error('Webcam initialization failed:', err2);
         setStreamActive(false);
       }
     }
@@ -133,7 +151,9 @@ export default function Camera() {
             autoPlay
             playsInline
             muted
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            width={640}
+            height={480}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
           />
         ) : (
           <div style={{ textAlign: 'center', padding: 20 }}>

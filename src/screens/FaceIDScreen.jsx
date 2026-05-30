@@ -118,7 +118,7 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
       } else {
         setFaceDetected(true);
       }
-    }, 500);
+    }, 250);
   };
 
   const startScan = async () => {
@@ -127,16 +127,16 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
       return;
     }
     // For registration we capture multiple samples to improve accuracy
-    if (mode === 'setup') {
+      if (mode === 'setup') {
       enrollmentSamplesRef.current = [];
       setEnrollmentIndex(0);
       setPhase('scanning');
       setStatusMsg('Capturing biometrics (1 of 3)...');
-      setTimeout(() => captureAndVerify(), 800);
+      setTimeout(() => captureAndVerify(), 300);
     } else {
       setPhase('scanning');
       setStatusMsg('Verifying identity...');
-      setTimeout(() => captureAndVerify(), 800);
+      setTimeout(() => captureAndVerify(), 300);
     }
   };
 
@@ -188,7 +188,7 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
         setEnrollmentIndex(got);
         if (got < 3) {
           setStatusMsg(`Captured ${got} of 3 samples. Hold still for next capture...`);
-          setTimeout(() => captureAndVerify(), 900);
+          setTimeout(() => captureAndVerify(), 300);
           return;
         }
 
@@ -254,7 +254,7 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
 
     setPhase('done');
     setStatusMsg('Face ID Enrolled!');
-    setTimeout(() => onSuccess(photoUrl), 1500);
+    setTimeout(() => onSuccess(photoUrl), 700);
   };
 
   const handleCaptureResult = async (descriptor) => {
@@ -283,9 +283,9 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
     const euclidThreshold = 0.6;
     const bestCos = bestMatch ? cosineSimilarity(descriptor, bestMatch.face_descriptor || []) : 0;
     if ((minDistance < euclidThreshold || bestCos > cosThreshold) && bestMatch) {
-      setPhase('done');
-      setStatusMsg(`Hello, ${bestMatch.name}!`);
-      setTimeout(() => onSuccess(bestMatch), 1500);
+  setPhase('done');
+  setStatusMsg(`Hello, ${bestMatch.name}!`);
+  setTimeout(() => onSuccess(bestMatch), 700);
     } else if (!modelsLoaded && users.length > 0) {
       // Simulator Auto-match convenience bypass
       const fallbackUser = users[0];

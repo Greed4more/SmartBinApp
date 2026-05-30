@@ -16,6 +16,7 @@ export default function Camera() {
   const [phase, setPhase] = useState('idle'); // idle, scanning, result, error
   const [activeItem, setActiveItem] = useState(null);
   const [statusMsg, setStatusMsg] = useState('');
+  const [cameraError, setCameraError] = useState('');
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
@@ -26,43 +27,135 @@ export default function Camera() {
 
   const startVideo = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        // Ensure video element is properly configured for playback
-        videoRef.current.setAttribute('playsinline', '');
-        videoRef.current.setAttribute('autoplay', '');
-        videoRef.current.setAttribute('muted', '');
-        
-        // Ensure video plays once stream is loaded
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current.play().catch(err => console.warn('Autoplay failed:', err));
-        };
+      console.log('[Camera] Requesting camera access...');
+      
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('getUserMedia is not supported in this browser');
       }
-      streamRef.current = stream;
-      setStreamActive(true);
-    } catch (err) {
-      console.warn('Rear camera failed, trying default camera:', err);
+
+      // Check if we're on HTTPS or localhost (required for camera access)
+      const isSecureContext = window.isSecureContext || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      if (!isSecureContext) {
+        console.warn('[Camera] Not on secure context (HTTPS or localhost). Camera may not work.');
+      }
+
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } 
+        });
+        console.log('[Camera] Rear camera stream acquired');
         if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          // Ensure video element is properly configured for playback
-          videoRef.current.setAttribute('playsinline', '');
-          videoRef.current.setAttribute('autoplay', '');
-          videoRef.current.setAttribute('muted', '');
-          
-          // Ensure video plays once stream is loaded
-          videoRef.current.onloadedmetadata = () => {
-            videoRef.current.play().catch(err => console.warn('Autoplay failed:', err));
-          };
+          applyStreamToVideo(videoRef.current, stream);
         }
         streamRef.current = stream;
         setStreamActive(true);
-      } catch (err2) {
-        console.error('Webcam initialization failed:', err2);
-        setStreamActive(false);
+        setCameraError('');
+      } catch (err) {
+        console.warn('[Camera] Rear camera failed:', err.message);
+        // Fallback to default camera
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          console.log('[Camera] Default camera stream acquired');
+          if (videoRef.current) {
+            applyStreamToVideo(videoRef.current, stream);
+          }
+          streamRef.current = stream;
+          setStreamActive(true);
+          setCameraError('');
+        } catch (err2) {
+          throw err2;
+        }
       }
+    } catch (err) {
+      console.error('[Camera] Camera initialization failed:', err.message);
+      
+      // Provide helpful error messages
+      let errorMsg = 'Camera access denied.';
+      if (err.name === 'NotAllowedError') {
+        errorMsg = 'Camera permission denied. Please check browser settings.';
+      } else if (err.name === 'NotFoundError') {
+        errorMsg = 'No camera found on this device.';
+      } else if (err.name === 'NotReadableError') {
+        errorMsg = 'Camera is already in use by another application.';
+      } else if (err.message.includes('getUserMedia')) {
+        errorMsg = 'Browser does not support camera access.';
+      }
+      
+      setCameraError(errorMsg);
+      setStreamActive(true);
+      // Use canvas fallback for development/testing
+      setTimeout(() => startCanvasFallback(), 100);
+    }
+  };
+
+  const applyStreamToVideo = (videoElement, stream) => {
+    if (videoElement.tagName === 'VIDEO') {
+      videoElement.srcObject = stream;
+      videoElement.setAttribute('playsinline', 'true');
+      videoElement.setAttribute('autoplay', 'true');
+      videoElement.setAttribute('muted', 'true');
+      
+      videoElement.onloadedmetadata = () => {
+        console.log('[Camera] Video metadata loaded, starting playback');
+        const playPromise = videoElement.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => console.log('[Camera] Video playback started'))
+            .catch(err => console.warn('[Camera] Autoplay failed:', err));
+        }
+      };
+    }
+  };
+
+  const startCanvasFallback = () => {
+    console.log('[Camera] Starting canvas fallback for camera simulation');
+    if (videoRef.current) {
+      // Create a hidden canvas for fallback drawing
+      const canvas = document.createElement('canvas');
+      canvas.width = 640;
+      canvas.height = 480;
+      const ctx = canvas.getContext('2d');
+      
+      let frameCount = 0;
+      const drawFrame = () => {
+        frameCount++;
+        
+        // Draw a gradient background simulating a camera view
+        const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+        gradient.addColorStop(0, '#2a4a3a');
+        gradient.addColorStop(0.5, '#1a3a2a');
+        gradient.addColorStop(1, '#0a1a1a');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Add some visual noise for realism
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const noise = Math.random() * 20;
+          data[i] += noise;
+          data[i + 1] += noise;
+          data[i + 2] += noise;
+        }
+        ctx.putImageData(imageData, 0, 0);
+        
+        // Draw center circle to indicate camera is active
+        ctx.strokeStyle = '#E8C547';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, canvas.height / 2, 80, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Draw frame counter
+        ctx.fillStyle = '#E8C547';
+        ctx.font = '12px monospace';
+        ctx.fillText(`FRAME: ${frameCount}`, 10, 30);
+        
+        requestAnimationFrame(drawFrame);
+      };
+      
+      drawFrame();
     }
   };
 
@@ -158,7 +251,14 @@ export default function Camera() {
         ) : (
           <div style={{ textAlign: 'center', padding: 20 }}>
             <span style={{ fontSize: 40 }}>📹</span>
-            <div style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 10, marginTop: 8 }}>VIRTUAL CAMERA CAMERA EMULATION</div>
+            {cameraError ? (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ color: '#E85454', fontFamily: 'var(--font-mono)', fontSize: 11, marginTop: 8, fontWeight: 600 }}>CAMERA ERROR</div>
+                <div style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 9, marginTop: 6, lineHeight: 1.4 }}>{cameraError}</div>
+              </div>
+            ) : (
+              <div style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 10, marginTop: 8 }}>INITIALIZING CAMERA...</div>
+            )}
           </div>
         )}
 

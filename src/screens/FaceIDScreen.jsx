@@ -16,6 +16,7 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const detectionInterval = useRef(null);
+  const [successPayload, setSuccessPayload] = useState(null);
 
   useEffect(() => {
     loadModels();
@@ -254,7 +255,7 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
 
     setPhase('done');
     setStatusMsg('Face ID Enrolled!');
-    setTimeout(() => onSuccess(photoUrl), 700);
+    setSuccessPayload(photoUrl);
   };
 
   const handleCaptureResult = async (descriptor) => {
@@ -283,15 +284,15 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
     const euclidThreshold = 0.6;
     const bestCos = bestMatch ? cosineSimilarity(descriptor, bestMatch.face_descriptor || []) : 0;
     if ((minDistance < euclidThreshold || bestCos > cosThreshold) && bestMatch) {
-  setPhase('done');
-  setStatusMsg(`Hello, ${bestMatch.name}!`);
-  setTimeout(() => onSuccess(bestMatch), 700);
+      setPhase('done');
+      setStatusMsg(`Hello, ${bestMatch.name}!`);
+      setSuccessPayload(bestMatch);
     } else if (!modelsLoaded && users.length > 0) {
       // Simulator Auto-match convenience bypass
       const fallbackUser = users[0];
       setPhase('done');
       setStatusMsg(`Auto-Match: Welcome, ${fallbackUser.name}!`);
-      setTimeout(() => onSuccess(fallbackUser), 1500);
+      setSuccessPayload(fallbackUser);
     } else {
       throw new Error('Identity not verified. Try again.');
     }
@@ -357,6 +358,17 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
           >
             {mode === 'setup' ? 'BEGIN REGISTRATION' : 'START VERIFY SCAN'}
           </button>
+        )}
+
+        {phase === 'done' && successPayload && (
+          <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ color: '#BCE6B0', fontSize: 13, fontFamily: 'var(--font-mono)' }}>Confirmation</div>
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: 12, borderRadius: 8 }}>{typeof successPayload === 'string' ? 'Face enrolled successfully.' : `Welcome back, ${successPayload.name || 'User'}!`}</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => { onSuccess(successPayload); }} className="scan-btn" style={{ flex: 1 }}>OK</button>
+              <button onClick={() => { setPhase('idle'); setSuccessPayload(null); setStatusMsg('Position your face in the frame'); }} style={{ flex: 1, background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', color: 'var(--text-muted)', borderRadius: 8 }}>CANCEL</button>
+            </div>
+          </div>
         )}
 
         {phase === 'idle' && mode === 'setup' && (

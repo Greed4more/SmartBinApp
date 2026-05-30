@@ -12,6 +12,7 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
   const [enrollmentIndex, setEnrollmentIndex] = useState(0);
   const enrollmentSamplesRef = useRef([]);
   const lastCapturedDataUrl = useRef(null);
+  const [cameraActive, setCameraActive] = useState(false);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const detectionInterval = useRef(null);
@@ -92,11 +93,13 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
         }
       }
       streamRef.current = stream;
+      setCameraActive(true);
     } catch (err) {
       console.warn('Camera access denied:', err);
       setPhase('idle');
       setFaceDetected(true);
       setStatusMsg('Camera access unavailable. Using virtual simulator.');
+      setCameraActive(false);
     }
   };
 
@@ -325,6 +328,11 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
           muted
           style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
         />
+        {!cameraActive && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button onClick={() => { setStatusMsg('Starting camera...'); startCamera(); }} style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--yellow)', color: 'var(--bg)', border: 'none', cursor: 'pointer' }}>Enable Camera</button>
+          </div>
+        )}
 
         {/* Scanning Scanner Bar */}
         {phase === 'scanning' && (

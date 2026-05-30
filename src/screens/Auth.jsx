@@ -18,6 +18,7 @@ export default function Auth() {
   const [showFaceScan, setShowFaceScan] = useState(false)
   const [faceMode, setFaceMode] = useState('setup')
   const [pendingUser, setPendingUser] = useState(null)
+  const [shouldRegisterFace, setShouldRegisterFace] = useState(true)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -27,14 +28,21 @@ export default function Auth() {
         await login(email, password)
       } else {
         const newUser = await register(name, email, password, { phone, state, city, pincode, dob })
-        setPendingUser(newUser)
-        setFaceMode('setup')
-        setShowFaceScan(true)
+        // If user chooses to register face, open FaceID setup; otherwise finish registration normally.
+        if (shouldRegisterFace) {
+          setPendingUser(newUser)
+          setFaceMode('setup')
+          setShowFaceScan(true)
+        } else {
+          setPendingUser(null)
+          loginUser(newUser)
+        }
       }
     } catch (err) {
       setError(err.message)
     }
   }
+
 
   const handleFaceSuccess = (userOrPhotoUrl) => {
     if (pendingUser) {
@@ -112,6 +120,29 @@ export default function Auth() {
           <button type="submit" disabled={loading} className="scan-btn" style={{ marginTop: 8, height: 44, fontSize: 18 }}>
             {loading ? t('processing').toUpperCase() : isLogin ? t('signIn').toUpperCase() : t('signUp').toUpperCase()}
           </button>
+
+          {!isLogin && (
+            <button
+              type="button"
+              onClick={() => setShouldRegisterFace(v => !v)}
+              style={{
+                width: '100%', marginTop: 10, padding: '12px',
+                background: shouldRegisterFace ? 'rgba(232,197,71,0.12)' : 'rgba(255,255,255,0.04)',
+                border: shouldRegisterFace ? '1px solid var(--yellow)' : '1px solid var(--border)',
+                color: shouldRegisterFace ? 'var(--yellow)' : 'var(--text-muted)',
+                borderRadius: 12,
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 10,
+                cursor: 'pointer'
+              }}
+            >
+              {shouldRegisterFace ? '✅' : '⬜'} Register face for FaceID login
+            </button>
+          )}
         </form>
 
         <button
@@ -128,6 +159,7 @@ export default function Auth() {
         >
           👤 {t('signInFaceId').toUpperCase()}
         </button>
+
 
         <button
           type="button"

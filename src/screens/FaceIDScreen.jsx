@@ -23,7 +23,15 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
 
   const loadModels = async () => {
     try {
-      // Lazy-load face-api.min.js from CDN when not already present on window
+      // Lazy-load TensorFlow.js and face-api.min.js from CDN when not already present on window
+      if (!window.tf) {
+        setStatusMsg('Loading TensorFlow runtime...');
+        // A relatively small tfjs build; pin to a compatible version
+        await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js').catch(e => {
+          console.warn('Could not load tfjs:', e);
+        });
+      }
+
       if (!window.faceapi) {
         setStatusMsg('Loading face recognition library...');
         await loadScript('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js');

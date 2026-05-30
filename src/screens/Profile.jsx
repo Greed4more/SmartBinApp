@@ -339,6 +339,18 @@ export default function Profile() {
           <span style={{ color: 'var(--yellow)', fontSize: 14 }}>➔</span>
         </div>
       </div>
+      {/* Floating quick access for FaceID (always visible when logged in) */}
+      {user && (
+        <button onClick={() => { setFaceMode('setup'); setShowFaceModal(true); }}
+          title="Open FaceID"
+          style={{
+            position: 'fixed', right: 18, bottom: 18, zIndex: 3000,
+            background: 'linear-gradient(180deg,#E8C547,#C89E22)', border: 'none', color: '#111', padding: '10px 12px', borderRadius: 12, boxShadow: '0 6px 18px rgba(0,0,0,0.4)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 13
+          }}
+        >
+          👤 FaceID
+        </button>
+      )}
     </div>
   );
 }

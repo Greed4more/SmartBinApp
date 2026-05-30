@@ -8,159 +8,117 @@ const SIMULATED_ITEMS = [
   { item_name: 'Banana Peel', category: 'wet', recyclable: false, hazardous: false, confidence: 98, description: 'Organic biodegradable fruit peel.', disposal_tip: 'Compost-ready material. Route directly to the organic wet bin.' },
   { item_name: 'Cardboard Box', category: 'dry', recyclable: true, hazardous: false, confidence: 92, description: 'Pressed cellulose paper carton.', disposal_tip: 'Flatten boxes completely and drop inside the dry recycling container.' },
   { item_name: 'Lithium Battery', category: 'ewaste', recyclable: false, hazardous: true, confidence: 90, description: 'Heavy metal alkaline cell energy source.', disposal_tip: 'Hazardous waste. Must be stored separately to prevent fire risks.' },
-]
+];
 
 export default function Camera() {
   const { t, saveScan } = useApp();
-  const [streamActive, setStreamActive] = useState(false);
-  const [phase, setPhase] = useState('idle'); // idle, scanning, result, error
+  const [phase, setPhase] = useState('idle');
   const [activeItem, setActiveItem] = useState(null);
   const [statusMsg, setStatusMsg] = useState('');
-  const [cameraError, setCameraError] = useState('');
-  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
   const streamRef = useRef(null);
+  const animationRef = useRef(null);
 
   useEffect(() => {
-    startVideo();
-    return () => stopVideo();
+    initializeCamera();
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
   }, []);
 
-  const startVideo = async () => {
+  const initializeCamera = async () => {
     try {
-      console.log('[Camera] Requesting camera access...');
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
       
-      // Check if getUserMedia is supported
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('getUserMedia is not supported in this browser');
-      }
-
-      // Check if we're on HTTPS or localhost (required for camera access)
-      const isSecureContext = window.isSecureContext || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      if (!isSecureContext) {
-        console.warn('[Camera] Not on secure context (HTTPS or localhost). Camera may not work.');
-      }
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } 
-        });
-        console.log('[Camera] Rear camera stream acquired');
-        if (videoRef.current) {
-          applyStreamToVideo(videoRef.current, stream);
-        }
-        streamRef.current = stream;
-        setStreamActive(true);
-        setCameraError('');
-      } catch (err) {
-        console.warn('[Camera] Rear camera failed:', err.message);
-        // Fallback to default camera
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          console.log('[Camera] Default camera stream acquired');
-          if (videoRef.current) {
-            applyStreamToVideo(videoRef.current, stream);
+      if (canvasRef.current) {
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.play();
+        
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = 640;
+        canvas.height = 480;
+        
+        const drawFrame = () => {
+          if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           }
-          streamRef.current = stream;
-          setStreamActive(true);
-          setCameraError('');
-        } catch (err2) {
-          throw err2;
-        }
+          animationRef.current = requestAnimationFrame(drawFrame);
+        };
+        
+        video.onloadedmetadata = () => {
+          drawFrame();
+        };
+        
+        streamRef.current = stream;
       }
     } catch (err) {
-      console.error('[Camera] Camera initialization failed:', err.message);
-      
-      // Provide helpful error messages
-      let errorMsg = 'Camera access denied.';
-      if (err.name === 'NotAllowedError') {
-        errorMsg = 'Camera permission denied. Please check browser settings.';
-      } else if (err.name === 'NotFoundError') {
-        errorMsg = 'No camera found on this device.';
-      } else if (err.name === 'NotReadableError') {
-        errorMsg = 'Camera is already in use by another application.';
-      } else if (err.message.includes('getUserMedia')) {
-        errorMsg = 'Browser does not support camera access.';
+      console.error('Camera error:', err);
+      if (canvasRef.current) {
+        drawSimulatedCamera();
       }
-      
-      setCameraError(errorMsg);
-      setStreamActive(true);
-      // Use canvas fallback for development/testing
-      setTimeout(() => startCanvasFallback(), 100);
     }
   };
 
-  const applyStreamToVideo = (videoElement, stream) => {
-    if (videoElement.tagName === 'VIDEO') {
-      videoElement.srcObject = stream;
-      videoElement.setAttribute('playsinline', 'true');
-      videoElement.setAttribute('autoplay', 'true');
-      videoElement.setAttribute('muted', 'true');
+  const drawSimulatedCamera = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    canvas.width = 640;
+    canvas.height = 480;
+    
+    let frameCount = 0;
+    const draw = () => {
+      frameCount++;
       
-      videoElement.onloadedmetadata = () => {
-        console.log('[Camera] Video metadata loaded, starting playback');
-        const playPromise = videoElement.play();
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => console.log('[Camera] Video playback started'))
-            .catch(err => console.warn('[Camera] Autoplay failed:', err));
-        }
-      };
-    }
-  };
-
-  const startCanvasFallback = () => {
-    console.log('[Camera] Starting canvas fallback for camera simulation');
-    if (videoRef.current) {
-      // Create a hidden canvas for fallback drawing
-      const canvas = document.createElement('canvas');
-      canvas.width = 640;
-      canvas.height = 480;
-      const ctx = canvas.getContext('2d');
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, '#1a4d2e');
+      gradient.addColorStop(0.5, '#0f2818');
+      gradient.addColorStop(1, '#051005');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       
-      let frameCount = 0;
-      const drawFrame = () => {
-        frameCount++;
-        
-        // Draw a gradient background simulating a camera view
-        const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-        gradient.addColorStop(0, '#2a4a3a');
-        gradient.addColorStop(0.5, '#1a3a2a');
-        gradient.addColorStop(1, '#0a1a1a');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Add some visual noise for realism
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-        for (let i = 0; i < data.length; i += 4) {
-          const noise = Math.random() * 20;
-          data[i] += noise;
-          data[i + 1] += noise;
-          data[i + 2] += noise;
-        }
-        ctx.putImageData(imageData, 0, 0);
-        
-        // Draw center circle to indicate camera is active
-        ctx.strokeStyle = '#E8C547';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(canvas.width / 2, canvas.height / 2, 80, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        // Draw frame counter
-        ctx.fillStyle = '#E8C547';
-        ctx.font = '12px monospace';
-        ctx.fillText(`FRAME: ${frameCount}`, 10, 30);
-        
-        requestAnimationFrame(drawFrame);
-      };
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const noise = Math.random() * 15;
+        data[i] += noise;
+        data[i + 1] += noise;
+        data[i + 2] += noise;
+      }
+      ctx.putImageData(imageData, 0, 0);
       
-      drawFrame();
-    }
-  };
-
-  const stopVideo = () => {
-    if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      ctx.strokeStyle = '#E8C547';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 60, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      ctx.strokeStyle = 'rgba(232, 197, 71, 0.5)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(centerX - 30, centerY);
+      ctx.lineTo(centerX + 30, centerY);
+      ctx.moveTo(centerX, centerY - 30);
+      ctx.lineTo(centerX, centerY + 30);
+      ctx.stroke();
+      
+      animationRef.current = requestAnimationFrame(draw);
+    };
+    
+    draw();
   };
 
   const triggerScan = () => {
@@ -168,28 +126,26 @@ export default function Camera() {
     setStatusMsg('Capturing scan profile...');
 
     setTimeout(() => {
-      // Pick random simulated item
       const item = SIMULATED_ITEMS[Math.floor(Math.random() * SIMULATED_ITEMS.length)];
       
-      // Perform flash
       const flash = document.createElement('div');
-      flash.style.position = 'fixed'; flash.style.inset = 0; flash.style.background = '#fff'; flash.style.zIndex = 3000;
+      flash.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:3000;opacity:1;transition:opacity 0.2s';
       document.body.appendChild(flash);
       setTimeout(() => flash.style.opacity = 0, 50);
       setTimeout(() => document.body.removeChild(flash), 200);
 
       setStatusMsg('AI Model Sorting...');
+      
       setTimeout(async () => {
         try {
           let photoUrl = 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=300&q=80';
           
-          if (videoRef.current && videoRef.current.readyState === 4) {
-            const canvas = document.createElement('canvas');
-            canvas.width = videoRef.current.videoWidth;
-            canvas.height = videoRef.current.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(videoRef.current, 0, 0);
-            photoUrl = await uploadToCloudinary(canvas.toDataURL('image/jpeg', 0.6));
+          if (canvasRef.current) {
+            try {
+              photoUrl = await uploadToCloudinary(canvasRef.current.toDataURL('image/jpeg', 0.6));
+            } catch (e) {
+              console.warn('Failed to upload canvas image', e);
+            }
           }
 
           const ecoCoinsEarned = item.hazardous ? 2 : item.recyclable ? 15 : 5;
@@ -209,7 +165,7 @@ export default function Camera() {
           setActiveItem(scanRecord);
           setPhase('result');
         } catch (err) {
-          console.error(err);
+          console.error('Scan error:', err);
           setPhase('error');
           setStatusMsg('Failed to sync scan profile.');
         }
@@ -235,36 +191,30 @@ export default function Camera() {
 
       {/* Frame / Cam viewport */}
       <div style={{
-        position: 'relative', flex: 1, margin: '16px 20px', borderRadius: 16, overflow: 'hidden',
-        background: '#0D0D0C', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+        position: 'relative', 
+        flex: 1, 
+        margin: '16px 20px', 
+        borderRadius: 16, 
+        overflow: 'hidden',
+        background: '#0D0D0C', 
+        border: '1px solid var(--border)', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center'
       }}>
-        {streamActive ? (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            width={640}
-            height={480}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          />
-        ) : (
-          <div style={{ textAlign: 'center', padding: 20 }}>
-            <span style={{ fontSize: 40 }}>📹</span>
-            {cameraError ? (
-              <div style={{ marginTop: 12 }}>
-                <div style={{ color: '#E85454', fontFamily: 'var(--font-mono)', fontSize: 11, marginTop: 8, fontWeight: 600 }}>CAMERA ERROR</div>
-                <div style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 9, marginTop: 6, lineHeight: 1.4 }}>{cameraError}</div>
-              </div>
-            ) : (
-              <div style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 10, marginTop: 8 }}>INITIALIZING CAMERA...</div>
-            )}
-          </div>
-        )}
+        <canvas
+          ref={canvasRef}
+          style={{
+            width: '100%',
+            height: '100%',
+            display: 'block',
+            background: '#0D0D0C'
+          }}
+        />
 
         {/* Framing brackets overlay */}
         {phase === 'idle' && (
-          <div className="camera-frame">
+          <div style={{ position: 'absolute', inset: 0 }}>
             <div style={{ position: 'absolute', top: 20, left: 20, width: 24, height: 24, borderLeft: '3px solid var(--yellow)', borderTop: '3px solid var(--yellow)' }} />
             <div style={{ position: 'absolute', top: 20, right: 20, width: 24, height: 24, borderRight: '3px solid var(--yellow)', borderTop: '3px solid var(--yellow)' }} />
             <div style={{ position: 'absolute', bottom: 20, left: 20, width: 24, height: 24, borderLeft: '3px solid var(--yellow)', borderBottom: '3px solid var(--yellow)' }} />
@@ -280,10 +230,20 @@ export default function Camera() {
         {/* Scan Status banner */}
         {statusMsg && (
           <div style={{
-            position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
-            background: 'rgba(20,20,18,0.95)', border: '1px solid var(--yellow)', color: 'var(--yellow)',
-            fontFamily: 'var(--font-mono)', fontSize: 10, padding: '8px 16px', borderRadius: 20,
-            boxShadow: '0 4px 15px rgba(0,0,0,0.5)', zIndex: 10, whiteSpace: 'nowrap'
+            position: 'absolute', 
+            bottom: 20, 
+            left: '50%', 
+            transform: 'translateX(-50%)',
+            background: 'rgba(20,20,18,0.95)', 
+            border: '1px solid var(--yellow)', 
+            color: 'var(--yellow)',
+            fontFamily: 'var(--font-mono)', 
+            fontSize: 10, 
+            padding: '8px 16px', 
+            borderRadius: 20,
+            boxShadow: '0 4px 15px rgba(0,0,0,0.5)', 
+            zIndex: 10, 
+            whiteSpace: 'nowrap'
           }}>
             {statusMsg.toUpperCase()}
           </div>
@@ -311,19 +271,27 @@ export default function Camera() {
 
         {phase === 'result' && activeItem && (
           <div className="card card-enter" style={{ border: '1px solid var(--yellow)' }}>
-            <div style={{ display: 'flex', justifySpace: 'between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{
-                fontFamily: 'var(--font-display)', fontSize: 18, color: 'var(--yellow)',
-                background: 'rgba(232,197,71,0.08)', padding: '2px 8px', borderRadius: 4
+                fontFamily: 'var(--font-display)', 
+                fontSize: 18, 
+                color: 'var(--yellow)',
+                background: 'rgba(232,197,71,0.08)', 
+                padding: '2px 8px', 
+                borderRadius: 4
               }}>
                 {activeItem.item_name}
               </span>
               <span style={{
-                fontFamily: 'var(--font-mono)', fontSize: 9,
+                fontFamily: 'var(--font-mono)', 
+                fontSize: 9,
                 background: activeItem.recyclable ? 'rgba(74,124,78,0.2)' : 'rgba(232,84,84,0.2)',
                 color: activeItem.recyclable ? '#6BBF6F' : '#E85454',
                 border: activeItem.recyclable ? '1px solid #4A7C4E' : '1px solid #E85454',
-                padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase', marginLeft: 'auto'
+                padding: '2px 6px', 
+                borderRadius: 4, 
+                textTransform: 'uppercase', 
+                marginLeft: 'auto'
               }}>
                 {activeItem.recyclable ? 'RECYCLABLE' : 'NON-RECYCLABLE'}
               </span>
@@ -332,20 +300,30 @@ export default function Camera() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 14 }}>
               <div>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-muted)' }}>CATEGORY</span>
-                <div style={{ fontSize: 13, textTransform: 'capitalize', fontWeight: 600, marginTop: 2 }}>{t(activeItem.category)}</div>
+                <div style={{ fontSize: 13, textTransform: 'capitalize', fontWeight: 600, marginTop: 2 }}>
+                  {t(activeItem.category)}
+                </div>
               </div>
               <div>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-muted)' }}>REWARD COINS</span>
-                <div style={{ fontSize: 13, color: 'var(--yellow)', fontWeight: 600, marginTop: 2 }}>+{activeItem.eco_coins_earned} Coins</div>
+                <div style={{ fontSize: 13, color: 'var(--yellow)', fontWeight: 600, marginTop: 2 }}>
+                  +{activeItem.eco_coins_earned} Coins
+                </div>
               </div>
             </div>
 
             <div style={{ marginTop: 12 }}>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--text-muted)' }}>DISPOSAL TIPS</span>
-              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 2, lineHeight: 1.4 }}>{activeItem.disposal_tip}</p>
+              <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 2, lineHeight: 1.4 }}>
+                {activeItem.disposal_tip}
+              </p>
             </div>
 
-            <button onClick={resetScan} className="scan-btn" style={{ marginTop: 16, height: 40, fontSize: 13, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid var(--border)' }}>
+            <button 
+              onClick={resetScan} 
+              className="scan-btn" 
+              style={{ marginTop: 16, height: 40, fontSize: 13, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid var(--border)' }}
+            >
               SCAN ANOTHER
             </button>
           </div>

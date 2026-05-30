@@ -155,7 +155,7 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
   let descriptor = Array.from({ length: 128 }, () => (Math.random() - 0.5) * 0.2); // baseline random vector
   let dataUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'; // fallback profile photo
 
-      if (videoRef.current && videoRef.current.readyState === 4) {
+      if (videoRef.current && videoRef.current.videoWidth && videoRef.current.videoHeight) {
         const canvas = document.createElement('canvas');
         canvas.width = videoRef.current.videoWidth;
         canvas.height = videoRef.current.videoHeight;
@@ -164,7 +164,10 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
         dataUrl = canvas.toDataURL('image/jpeg', 0.6);
 
         if (modelsLoaded && window.faceapi) {
-          const detection = await window.faceapi.detectSingleFace(canvas, new window.faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.35 })).withFaceLandmarks().withFaceDescriptor();
+          setStatusMsg('Detecting face...');
+          // wrap detection with a timeout so it cannot hang indefinitely
+          const detectionPromise = window.faceapi.detectSingleFace(canvas, new window.faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.35 })).withFaceLandmarks().withFaceDescriptor();
+          const detection = await promiseWithTimeout(detectionPromise, 2200);
           if (!detection) throw new Error('Face not recognized. Keep still.');
           descriptor = Array.from(detection.descriptor);
         }
@@ -206,10 +209,31 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
       }
     } catch (err) {
       console.error(err);
+      // Provide helpful message and move to error state so user can retry
       setPhase('error');
-      setStatusMsg(err.message || 'Face recognition failed.');
+      setStatusMsg(err.message || 'Face recognition failed. Try again.');
     }
   };
+
+  const promiseWithTimeout = (p, ms) => new Promise((resolve, reject) => {
+    let done = false;
+    const t = setTimeout(() => {
+      if (done) return;
+      done = true;
+      resolve(null); // timed out resolves to null so we can handle gracefully
+    }, ms);
+    p.then((res) => {
+      if (done) return;
+      done = true;
+      clearTimeout(t);
+      resolve(res);
+    }).catch((err) => {
+      if (done) return;
+      done = true;
+      clearTimeout(t);
+      reject(err);
+    });
+  });
 
   const averageDescriptors = (arr) => {
     if (!arr || arr.length === 0) return null;

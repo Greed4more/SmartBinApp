@@ -318,19 +318,13 @@ export default function FaceIDScreen({ onClose, onSuccess, targetUid, mode = 'se
         boxShadow: faceDetected ? '0 0 30px rgba(232,197,71,0.2)' : 'none',
         background: '#0D0D0C', transition: 'all 0.3s'
       }}>
-        {streamRef.current ? (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
-          />
-        ) : (
-          <div style={{ color: 'var(--text-muted)', fontSize: 11, fontFamily: 'var(--font-mono)', textAlign: 'center', padding: 20 }}>
-            [VIRTUAL VIEWPORT ACTIVE]
-          </div>
-        )}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
+        />
 
         {/* Scanning Scanner Bar */}
         {phase === 'scanning' && (

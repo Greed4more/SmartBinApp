@@ -1,14 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { uploadToCloudinary } from '../utils/cloudinary';
-
-const SIMULATED_ITEMS = [
-  { item_name: 'Soda Can', category: 'metal', recyclable: true, hazardous: false, confidence: 96, description: 'Aluminum beverage tin container.', disposal_tip: 'Rinse thoroughly before dropping in the metal collection compartment.' },
-  { item_name: 'Water Bottle', category: 'plastic', recyclable: true, hazardous: false, confidence: 94, description: 'PET plastic mineral bottle.', disposal_tip: 'Crush the container to minimize space and keep the cap secure.' },
-  { item_name: 'Banana Peel', category: 'wet', recyclable: false, hazardous: false, confidence: 98, description: 'Organic biodegradable fruit peel.', disposal_tip: 'Compost-ready material. Route directly to the organic wet bin.' },
-  { item_name: 'Cardboard Box', category: 'dry', recyclable: true, hazardous: false, confidence: 92, description: 'Pressed cellulose paper carton.', disposal_tip: 'Flatten boxes completely and drop inside the dry recycling container.' },
-  { item_name: 'Lithium Battery', category: 'ewaste', recyclable: false, hazardous: true, confidence: 90, description: 'Heavy metal alkaline cell energy source.', disposal_tip: 'Hazardous waste. Must be stored separately to prevent fire risks.' },
-];
+import { detectWaste } from '../utils/wasteDetection';
 
 export default function Camera() {
   const { t, saveScan } = useApp();
@@ -125,52 +118,67 @@ export default function Camera() {
     setPhase('scanning');
     setStatusMsg('Capturing scan profile...');
 
-    setTimeout(() => {
-      const item = SIMULATED_ITEMS[Math.floor(Math.random() * SIMULATED_ITEMS.length)];
-      
+    setTimeout(async () => {
       const flash = document.createElement('div');
       flash.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:3000;opacity:1;transition:opacity 0.2s';
       document.body.appendChild(flash);
       setTimeout(() => flash.style.opacity = 0, 50);
       setTimeout(() => document.body.removeChild(flash), 200);
 
-      setStatusMsg('AI Model Sorting...');
+      setStatusMsg('Analyzing waste type...');
       
       setTimeout(async () => {
         try {
-          let photoUrl = 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=300&q=80';
-          
+          // Capture canvas to image data
+          let imageDataUrl = null;
           if (canvasRef.current) {
+            imageDataUrl = canvasRef.current.toDataURL('image/jpeg', 0.8);
+          }
+
+          // Detect waste from image
+          setStatusMsg('Scanning with AI...');
+          let scanRecord = null;
+          
+          if (imageDataUrl) {
             try {
-              photoUrl = await uploadToCloudinary(canvasRef.current.toDataURL('image/jpeg', 0.6));
-            } catch (e) {
-              console.warn('Failed to upload canvas image', e);
+              const wasteInfo = await detectWaste(imageDataUrl);
+              if (wasteInfo) {
+                // Upload image to cloud
+                let photoUrl = 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=300&q=80';
+                try {
+                  photoUrl = await uploadToCloudinary(imageDataUrl);
+                } catch (uploadErr) {
+                  console.warn('Upload failed, using placeholder:', uploadErr);
+                }
+                
+                scanRecord = {
+                  ...wasteInfo,
+                  image_url: photoUrl
+                };
+              }
+            } catch (detectionErr) {
+              console.warn('Waste detection failed:', detectionErr);
             }
           }
 
-          const ecoCoinsEarned = item.hazardous ? 2 : item.recyclable ? 15 : 5;
-          const scanRecord = {
-            category: item.category,
-            item_name: item.item_name,
-            description: item.description,
-            confidence: item.confidence,
-            recyclable: item.recyclable,
-            hazardous: item.hazardous,
-            disposal_tip: item.disposal_tip,
-            eco_coins_earned: ecoCoinsEarned,
-            image_url: photoUrl
-          };
+          // If detection failed, show error
+          if (!scanRecord) {
+            setPhase('error');
+            setStatusMsg('Could not identify waste. Please try again with better lighting.');
+            return;
+          }
 
+          setStatusMsg('Saving scan...');
           await saveScan(scanRecord);
           setActiveItem(scanRecord);
           setPhase('result');
         } catch (err) {
           console.error('Scan error:', err);
           setPhase('error');
-          setStatusMsg('Failed to sync scan profile.');
+          setStatusMsg('Failed to process scan. Please try again.');
         }
-      }, 1000);
-    }, 1500);
+      }, 1500);
+    }, 1000);
   };
 
   const resetScan = () => {

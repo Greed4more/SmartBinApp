@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Image } from 'react-native';
+import FaceEnrollScreen from './FaceEnrollScreen';
+import { supabase } from '../lib/supabase';
 
 export default function ProfileScreen({ user, onLogout, onNavigate }) {
+  const [showEnroll, setShowEnroll] = useState(false);
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -27,6 +30,28 @@ export default function ProfileScreen({ user, onLogout, onNavigate }) {
               <Text style={styles.rankText}>LEVEL {user.level || 1} WARRIOR</Text>
             </View>
           </View>
+        </View>
+        <View style={{ marginLeft: 12 }}>
+          {user?.face_id_enabled ? (
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity onPress={() => setShowEnroll(true)} style={{ padding: 8, backgroundColor: 'rgba(232,197,71,0.08)', borderRadius: 8 }}>
+                <Text style={{ color: '#E8C547' }}>Re-enrol Face</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={async () => {
+                try {
+                  await supabase.from('users').update({ face_descriptor: null, face_id_enabled: false }).eq('uid', user.uid);
+                } catch (err) {
+                  console.warn('Failed to remove face:', err);
+                }
+              }} style={{ padding: 8, backgroundColor: 'transparent', borderRadius: 8 }}>
+                <Text style={{ color: '#fff' }}>Remove Face</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity onPress={() => setShowEnroll(true)} style={{ padding: 8, backgroundColor: 'rgba(232,197,71,0.08)', borderRadius: 8 }}>
+              <Text style={{ color: '#E8C547' }}>Register Face</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -54,6 +79,16 @@ export default function ProfileScreen({ user, onLogout, onNavigate }) {
           </Text>
         </View>
       </View>
+      {showEnroll && (
+        <FaceEnrollScreen user={user} onClose={() => setShowEnroll(false)} onSuccess={async () => {
+          setShowEnroll(false);
+          try {
+            const { data } = await supabase.from('users').select('*').eq('uid', user.uid).single();
+            // simple re-render by navigating back to profile
+            onNavigate('profile');
+          } catch (err) { console.warn('refresh error', err); }
+        }} />
+      )}
     </View>
   );
 }
